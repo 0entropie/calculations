@@ -273,7 +273,7 @@ class ExtremeErrorTest(ErrorClassTest):
 class ErrorPropagation(unittest.TestSuite):
 
     def __init__(self):
-        self.addTests((RelationTest(), StatisticalErrorTest(), ExtremeErrorTest()))
+        self.addTests((RelationTest(), StatisticalErrorTest(), ExtremeErrorTest(), WorstCaseErrorTest()))
 
 
 if __name__ == '__main__':
