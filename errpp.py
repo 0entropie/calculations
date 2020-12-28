@@ -41,13 +41,23 @@ class ValueWithError:
 
     def __mul__(self, other):
         new_val = self.value * other.value
-        return ValueWithError(new_val, self.error.update_err_mul(new_val, other.error))
+        if new_val == 0:
+            ref_val = max(self.value, other.value)
+        else:
+            ref_val = new_val
+        return ValueWithError(new_val, self.error.update_err_mul(ref_val, other.error))
 
     def __truediv__(self, other):
         if other.value == 0:
             raise ZeroDivisionError("Attempt to divide by 0 Value")
         new_val = self.value / other.value
-        return ValueWithError(new_val, self.error.update_err_div(new_val, other.error))
+
+        if new_val == 0:
+            ref_val = other.value
+        else:
+            ref_val = new_val
+
+        return ValueWithError(new_val, self.error.update_err_div(ref_val, other.error))
 
     def __neg__(self):
         return ValueWithError(-self.value, self.error)
@@ -96,6 +106,12 @@ class BaseError(abc.ABC):
         if not isinstance(other, self.__class__):
             raise TypeError("Different error types: ", type(self), type(other))
 
+    def calculate_rel_err_from_abs(self, ref_val, abs_err):
+        if ref_val == 0:
+            return None
+        else:
+            return abs(abs_err / ref_val)
+
     @abc.abstractmethod
     def update_err_add(self, ref_val, other):
         pass
@@ -118,12 +134,8 @@ class StatisticalError(BaseError):
     def update_err_add(self, ref_val, other):
         self.type_check(other)
         new_abs_err = math.sqrt(self.abs_err**2 + other.abs_err**2)
-        if ref_val != 0:
-            new_rel_err = abs(new_abs_err / ref_val)
-        else:
-            new_rel_err = None
 
-        return StatisticalError(new_abs_err, new_rel_err)
+        return StatisticalError(new_abs_err, self.calculate_rel_err_from_abs(ref_val, new_abs_err))
 
     # q = x-y , sqrt( dx**2 + dy**2 )
     def update_err_sub(self, ref_val, other):
@@ -133,11 +145,15 @@ class StatisticalError(BaseError):
     def update_err_mul(self, ref_val, other):
         self.type_check(other)
 
-        if self.rel_err is None or other.rel_err is None:
-            raise ValueError("Attempt to propagate invalid relative Error")
-
-        new_rel_error = math.sqrt(self.rel_err**2 + other.rel_err**2)
-        new_abs_error = abs(ref_val * new_rel_error)
+        if self.rel_err is None:
+            new_abs_error = abs(ref_val * other.abs_err)
+            new_rel_error = None
+        elif other.rel_err is None:
+            new_abs_error = abs(ref_val * self.abs_err)
+            new_rel_error = None
+        else:
+            new_rel_error = math.sqrt(self.rel_err**2 + other.rel_err**2)
+            new_abs_error = abs(ref_val * new_rel_error)
         return StatisticalError(new_abs_error, new_rel_error)
 
     # q = x/y , dq = q * sqrt( (dx/x)**2 + (dy/y)**2 ) = sqrt( (dx/y)**2 + (dy*x/(y*y))**2 )
@@ -151,11 +167,7 @@ class WorstCaseError(BaseError):
         self.type_check(other)
         new_abs_error = self.abs_err + other.abs_err
 
-        if ref_val != 0:
-            new_rel_error = abs(new_abs_error / ref_val)
-        else:
-            new_rel_error = None
-        return WorstCaseError(new_abs_error, new_rel_error)
+        return WorstCaseError(new_abs_error, self.calculate_rel_err_from_abs(ref_val, new_abs_error))
 
     # q = x-y , dq = dx+dy
     def update_err_sub(self, ref_val, other):
@@ -165,11 +177,15 @@ class WorstCaseError(BaseError):
     def update_err_mul(self, ref_val, other):
         self.type_check(other)
 
-        if self.rel_err is None or other.rel_err is None:
-            raise ValueError("Attempt to propagate invalid relative Error")
-
-        new_rel_error = self.rel_err + other.rel_err
-        new_abs_error = abs(new_rel_error * ref_val)
+        if self.rel_err is None:
+            new_abs_error = abs(ref_val * other.abs_err)
+            new_rel_error = None
+        elif other.rel_err is None:
+            new_abs_error = abs(ref_val * self.abs_err)
+            new_rel_error = None
+        else:
+            new_rel_error = self.rel_err + other.rel_err
+            new_abs_error = abs(new_rel_error * ref_val)
         return WorstCaseError(new_abs_error, new_rel_error)
 
     # q = x/y , dq = |q|*(dx/|x| + dy/|y|) = dx/|y| + dy*|x|/|y*y|
@@ -184,12 +200,7 @@ class ExtremeError(BaseError):
         self.type_check(other)
         new_abs_error = self.abs_err + other.abs_err
 
-        if ref_val != 0:
-            new_rel_error = abs(new_abs_error / ref_val)
-        else:
-            new_rel_error = None
-
-        return ExtremeError(new_abs_error, new_rel_error)
+        return ExtremeError(new_abs_error, self.calculate_rel_err_from_abs(ref_val, new_abs_error))
 
     # q = x-y , dq = dx+dy
     def update_err_sub(self, ref_val, other):
@@ -199,11 +210,16 @@ class ExtremeError(BaseError):
     def update_err_mul(self, ref_val, other):
         self.type_check(other)
 
-        if self.rel_err is None or other.rel_err is None:
-            raise ValueError("Attempt to propagate invalid relative Error")
+        if self.rel_err is None:
+            new_abs_error = abs(ref_val * other.abs_err + self.abs_to_rel_err * other.abs_err)
+            new_rel_error = None
+        elif other.rel_err is None:
+            new_abs_error = abs(ref_val * self.abs_err + self.abs_to_rel_err * other.abs_err)
+            new_rel_error = None
+        else:
+            new_rel_error = self.rel_err + other.rel_err + self.rel_err * other.rel_err
+            new_abs_error = abs(new_rel_error * ref_val)
 
-        new_rel_error = self.rel_err + other.rel_err + self.rel_err * other.rel_err
-        new_abs_error = abs(new_rel_error * ref_val)
         return ExtremeError(new_abs_error, new_rel_error)
 
     # q = x/y , q(1 + dq/|q|) = x(1 + dx/|x|) / (y(1 + dy/|y|)) ,, dq = (|x| + dx) / (|y| - dy) - |x/y|
