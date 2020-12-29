@@ -72,32 +72,31 @@ print("Vocm = {0:.3f} \u00B1 {1:.3f}%".format(Vocm, dVocm))
 #print(aoffs + 3.6 * (vref - 1))
 #
 #print("hallo")
-err = errpp.WorstCaseError
+err = errpp.WorstCasePropogation
 
 dr1245 = 0.001
 val_r1245 = 93500
-r1 = r2 = r4 = r5 = errpp.ValueWithError(val_r1245, err(dr1245, errpp.rel_to_abs_err(val_r1245, dr1245)))
+r1 = r2 = r4 = r5 = errpp.ValueWithError.from_val_rel_err_pair(val_r1245, dr1245, err())
 
 dr36 = 0.001
 val_r36 = 130e3
-r3 = r6 = errpp.ValueWithError(val_r36, err(dr36, errpp.rel_to_abs_err(val_r36, dr36)))
+r3 = r6 = errpp.ValueWithError.from_val_rel_err_pair(val_r36, dr36, err())
 
 val_vcc = 3.6
-Vcc = errpp.ValueWithError(val_vcc, err(2 , errpp.rel_to_abs_err(val_vcc, 0.02)))
+Vcc = errpp.ValueWithError.from_val_rel_err_pair(val_vcc, 0.02, err())
 
 val_vacc = 3.24
-Vacc = errpp.ValueWithError(val_vacc, err(7, errpp.rel_to_abs_err(val_vacc, 0.07)))  # @50g
+Vacc = errpp.ValueWithError.from_val_rel_err_pair(val_vacc, 0.07, err())
 
-fctr = errpp.ValueWithError(2, err(0, 0))  # @50g
+fctr = errpp.ValueWithError.from_val_abs_err_pair(2, 0, err())
 
 dvocm = 0.07
 val_vocm = 2.5
-Vocm = errpp.ValueWithError(val_vocm,
-                            err(dVocm, errpp.abs_to_rel_err(val_vocm, dVocm)))
+Vocm = errpp.ValueWithError.from_val_abs_err_pair(val_vocm, dVocm, err())
 
 dvaa = 0.2
 val_vaa = 0
-Vaa = errpp.ValueWithError(val_vaa, err(dvaa, None))
+Vaa = errpp.ValueWithError.from_val_abs_err_pair(val_vaa, dvaa, err())
 
 print(Vaa)
 
