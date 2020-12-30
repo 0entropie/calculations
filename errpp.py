@@ -88,12 +88,6 @@ class ValueWithError:
     def __value_with_same_prop(self, val, abs_err, rel_err):
         return ValueWithError(val, abs_err, rel_err, self.prop)
 
-    def __compatibility_check_decorator(method, left, right):
-        def add_compatiblity_check(left, right):
-            if not left.prop.is_compatible(right.prop):
-                raise ValueError("Incompatible propagation methods")
-            method(left, right)
-
     @_binary_arithmetic_op
     def __add__(self, other):
         pass
