@@ -17,20 +17,12 @@ def vwes_from_errtype_list_and_val_abs_err_pair(errtypelist, val_err_pair):
     return map(lambda et: vwe_from_val_abs_err_pair(et, val_err_pair), errtypelist)
 
 
-def vwes_with_random_vals_errs(errtype, n=2):
-    # closure, deal with it.
-    def vwe_from_pair_fixed_type(val_err_pair):
-        return vwe_from_val_abs_err_pair(errtype, val_err_pair)
-
-    val_err_pairs = (random_val_and_abs_error() for i in range(n))
-    return map(vwe_from_pair_fixed_type, val_err_pairs)
-
-
 def perform_binary_op_on_vwes(left_vwes, right_vwes, op):
     return map(lambda xy: op(*xy), zip(left_vwes, right_vwes))
 
 
 _TRIALS = 100000
+
 
 def _relation_binary_op_test(operation):
     def wrapper(method):
@@ -40,6 +32,7 @@ def _relation_binary_op_test(operation):
                 method(self, l, k, m)
         return perform_binary_op_test
     return wrapper
+
 
 class RelationTest(unittest.TestCase):
 
@@ -91,6 +84,7 @@ class RelationTest(unittest.TestCase):
         self.assertLessEqual(k.abs_err, l.abs_err, "is")
         self.assertLessEqual(l.abs_err, m.abs_err, "as")
 
+
 def _binary_op_propagation_test(operation):
     def wrapper(method):
         def perform_binary_op_test(self):
@@ -102,7 +96,8 @@ def _binary_op_propagation_test(operation):
         return perform_binary_op_test
     return wrapper
 
-class ErrorClassTest(unittest.TestCase, abc.ABC):
+
+class ErrorClassTest(abc.ABC):
 
     @abc.abstractmethod
     def getErrorType(self):
@@ -115,94 +110,102 @@ class ErrorClassTest(unittest.TestCase, abc.ABC):
     def round_dec(self, n, decs = 5):
         return round(n, decs)
 
-
     def compare_values_and_errors(self):
         self.assertEqual(self.round_dec(self.expected_val), self.round_dec(self.calculated.value))
         self.assertEqual(self.round_dec(abs(self.expected_error)), self.round_dec(self.calculated.abs_err))
 
     @_binary_op_propagation_test(operator.sub)
-    def tst_neg(self, a, b):
+    def test_negation(self, a, b):
         # overwrite preset values by decorator
         self.expected_val = -a.value
         self.expected_error = a.abs_err
         self.calculated = -a
 
 
-class StatisticalErrorTest(ErrorClassTest):
+def _create_error_class_test(testcls):
+    class _ErrorTestImpl(testcls, ErrorClassTest, unittest.TestCase):
+        def __new__(cls, *args, **kwargs):
+            clsdict = vars(testcls)
+            for attr_name in clsdict:
+                if attr_name.startswith("test_"):
+                    new_attr_val = clsdict[attr_name]
+                    if "add" in attr_name:
+                        new_attr_val = _binary_op_propagation_test(operator.add)(new_attr_val)
+                    elif "sub" in attr_name:
+                        new_attr_val = _binary_op_propagation_test(operator.sub)(new_attr_val)
+                    elif "mul" in attr_name:
+                        new_attr_val = _binary_op_propagation_test(operator.mul)(new_attr_val)
+                    elif "div" in attr_name:
+                        new_attr_val = _binary_op_propagation_test(operator.truediv)(new_attr_val)
+                    else:
+                        continue
+                    setattr(cls, attr_name, new_attr_val)
+            instance = object.__new__(cls)
+
+            return instance
+
+    return _ErrorTestImpl
+
+
+@_create_error_class_test
+class StatisticalErrorTest:
 
     def getErrorType(self):
         return errpp.StatisticalPropagation
 
-    test_negation = ErrorClassTest.tst_neg
-
-    @_binary_op_propagation_test(operator.add)
     def test_StatisticalError_add_error_correctness(self, a, b):
             self.expected_error = math.sqrt(a.abs_err**2 + b.abs_err**2)
 
-    @_binary_op_propagation_test(operator.sub)
     def test_StatisticalError_sub_error_correctness(self, a, b):
         self.expected_error = math.sqrt(a.abs_err**2 + b.abs_err**2)
 
-    @_binary_op_propagation_test(operator.mul)
     def test_StatisticalError_mul_error_correctness(self, a, b):
         self.expected_error = self.expected_val * math.sqrt(a.rel_err**2 + b.rel_err**2)
 
-    @_binary_op_propagation_test(operator.truediv)
     def test_StatisticalError_div_error_correctness(self, a, b):
         self.expected_error = self.expected_val * math.sqrt(a.rel_err**2 + b.rel_err**2)
 
 
-class WorstCaseErrorTest(ErrorClassTest):
+@_create_error_class_test
+class WorstCaseErrorTest:
 
     def getErrorType(self):
         return errpp.WorstCasePropogation
 
-    test_negation = ErrorClassTest.tst_neg
-
-    @_binary_op_propagation_test(operator.add)
     def test_WorstCaseError_add_error_correctness(self, a, b):
         self.expected_error = a.abs_err + b.abs_err
 
-    @_binary_op_propagation_test(operator.sub)
     def test_WorstCaseError_sub_error_correctness(self, a, b):
         self.expected_error = a.abs_err + b.abs_err
 
-    @_binary_op_propagation_test(operator.mul)
     def test_WorstCaseError_mul_error_correctness(self, a, b):
         self.expected_error = self.expected_val * (a.rel_err + b.rel_err)
 
-    @_binary_op_propagation_test(operator.truediv)
     def test_WorstCaseError_div_error_correctness(self, a, b):
         self.expected_error = (a.rel_err + b.rel_err) * self.expected_val
 
 
-class ExtremeErrorTest(ErrorClassTest):
+@_create_error_class_test
+class ExtremeErrorTest:
 
     def getErrorType(self):
         return errpp.ExtremePropagation
-    
-    test_negation = ErrorClassTest.tst_neg
 
-    @_binary_op_propagation_test(operator.add)
     def test_ExtremeError_add_error_correctness(self, a, b):
         self.expected_error = a.abs_err + b.abs_err
 
-
-    @_binary_op_propagation_test(operator.sub)
     def test_ExtremeError_sub_error_correctness(self, a, b):
         self.expected_error = a.abs_err + b.abs_err
 
-
-    @_binary_op_propagation_test(operator.mul)
     def test_ExtremeError_mul_error_correctness(self, a, b):
         self.expected_error = self.expected_val * (a.rel_err + b.rel_err + a.rel_err * b.rel_err)
 
-    @_binary_op_propagation_test(operator.truediv)
     def test_ExtremeError_div_error_correctness(self, a, b):
         lim1 = (abs(a.value) + a.abs_err) / (abs(b.value) - b.abs_err) - abs(self.expected_val)
         lim2 = (abs(a.value) - a.abs_err) / (abs(b.value) + b.abs_err) - abs(self.expected_val)
         # makes 0 fucking sense to me, how can there be a choice here when there is no choice in the impl...
         self.expected_error = max(lim1, lim2)
+
 
 class ErrorPropagation(unittest.TestSuite):
 
