@@ -133,7 +133,7 @@ def _create_error_class_test(testcls):
         def __new__(cls, *args, **kwargs):
             clsdict = vars(testcls)
             for attr_name in clsdict:
-                if attr_name.startswith("test_"):
+                if attr_name.startswith("test_random"):
                     new_attr_val = clsdict[attr_name]
                     if "add" in attr_name:
                         new_attr_val = _binary_op_propagation_test(operator.add)(new_attr_val)
@@ -159,16 +159,16 @@ class StatisticalErrorTest:
     def getErrorType(self):
         return errpp.StatisticalPropagation
 
-    def test_StatisticalError_add_error_correctness(self, a, b):
+    def test_random_StatisticalError_add_error_correctness(self, a, b):
             self.expected_error = math.sqrt(a.abs_err**2 + b.abs_err**2)
 
-    def test_StatisticalError_sub_error_correctness(self, a, b):
+    def test_random_StatisticalError_sub_error_correctness(self, a, b):
         self.expected_error = math.sqrt(a.abs_err**2 + b.abs_err**2)
 
-    def test_StatisticalError_mul_error_correctness(self, a, b):
+    def test_random_StatisticalError_mul_error_correctness(self, a, b):
         self.expected_error = self.expected_val * math.sqrt(a.rel_err**2 + b.rel_err**2)
 
-    def test_StatisticalError_div_error_correctness(self, a, b):
+    def test_random_StatisticalError_div_error_correctness(self, a, b):
         self.expected_error = self.expected_val * math.sqrt(a.rel_err**2 + b.rel_err**2)
 
 
@@ -178,16 +178,16 @@ class WorstCaseErrorTest:
     def getErrorType(self):
         return errpp.WorstCasePropogation
 
-    def test_WorstCaseError_add_error_correctness(self, a, b):
+    def test_random_WorstCaseError_add_error_correctness(self, a, b):
         self.expected_error = a.abs_err + b.abs_err
 
-    def test_WorstCaseError_sub_error_correctness(self, a, b):
+    def test_random_WorstCaseError_sub_error_correctness(self, a, b):
         self.expected_error = a.abs_err + b.abs_err
 
-    def test_WorstCaseError_mul_error_correctness(self, a, b):
+    def test_random_WorstCaseError_mul_error_correctness(self, a, b):
         self.expected_error = self.expected_val * (a.rel_err + b.rel_err)
 
-    def test_WorstCaseError_div_error_correctness(self, a, b):
+    def test_random_WorstCaseError_div_error_correctness(self, a, b):
         self.expected_error = (a.rel_err + b.rel_err) * self.expected_val
 
 
@@ -197,16 +197,16 @@ class ExtremeErrorTest:
     def getErrorType(self):
         return errpp.ExtremePropagation
 
-    def test_ExtremeError_add_error_correctness(self, a, b):
+    def test_random_ExtremeError_add_error_correctness(self, a, b):
         self.expected_error = a.abs_err + b.abs_err
 
-    def test_ExtremeError_sub_error_correctness(self, a, b):
+    def test_random_ExtremeError_sub_error_correctness(self, a, b):
         self.expected_error = a.abs_err + b.abs_err
 
-    def test_ExtremeError_mul_error_correctness(self, a, b):
+    def test_random_ExtremeError_mul_error_correctness(self, a, b):
         self.expected_error = self.expected_val * (a.rel_err + b.rel_err + a.rel_err * b.rel_err)
 
-    def test_ExtremeError_div_error_correctness(self, a, b):
+    def test_random_ExtremeError_div_error_correctness(self, a, b):
         lim1 = (abs(a.value) + a.abs_err) / (abs(b.value) - b.abs_err) - abs(self.expected_val)
         lim2 = (abs(a.value) - a.abs_err) / (abs(b.value) + b.abs_err) - abs(self.expected_val)
         # makes 0 fucking sense to me, how can there be a choice here when there is no choice in the impl...
