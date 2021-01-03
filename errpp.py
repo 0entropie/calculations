@@ -225,8 +225,13 @@ class ExtremePropagation(ErrorPropagationMethod):
 
     # q = x/y , q(1 + dq/|q|) = x(1 + dx/|x|) / (y(1 + dy/|y|)) ,, dq = (|x| + dx) / (|y| - dy) - |x/y|
     def propagate_error_div(self, div_result, left, right):
-        return (abs(left.value) + left.abs_err) / (abs(right.value) - right.abs_err)\
-                - abs(div_result)
+        numerator = abs(left.value) + left.abs_err
+        denominator = abs(right.value) - right.abs_err
+        if denominator == 0:
+            raise ValueError(
+                    "Can not propagate Value with 100% relative Error with Extreme method."
+                    f" Value: {right}")
+        return numerator / denominator - abs(div_result)
 
     def is_compatible(self, other):
         return isinstance(other, self.__class__)
