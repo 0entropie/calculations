@@ -41,12 +41,27 @@ def _binary_arithmetic_op(method):
 
     return perform_arithmetic_op
 
+
+_REL_ERROR_FACTOR_LIMIT = 10
+
+
+class ExcessiveErrorException(Exception):
+    def __init__(self, val, rel_err):
+        super().__init__(f"Relative Error {rel_err} ({decimal_to_percent(rel_err)})"
+                         f"for value {val} exceeds Limit of"
+                         f" {_REL_ERROR_FACTOR_LIMIT} ({decimal_to_percent(_REL_ERROR_FACTOR_LIMIT)}).")
+
+
 class ValueWithError:
 
     def __init__(self, value, abs_err, rel_err, prop_method):
         if not (isinstance(value, Number) or isinstance(abs_err, Number))\
                 or (rel_err is not None and not isinstance(rel_err, Number)):
             raise TypeError("Value and Errors need to be numeric types")
+
+        if rel_err is not None and rel_err > _REL_ERROR_FACTOR_LIMIT:
+            raise ExcessiveErrorException(value, rel_err)
+
         self.value = value
         self.__abs_err = abs(abs_err)
         self.__rel_err = abs(rel_err) if rel_err is not None else None

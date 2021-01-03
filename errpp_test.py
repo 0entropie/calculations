@@ -28,7 +28,10 @@ def _relation_binary_op_test(operation):
     def wrapper(method):
         def perform_binary_op_test(self):
             for left, right in zip(self.left_vwes, self.right_vwes):
-                l, k, m = tuple(perform_binary_op_on_vwes(left, right, operation))
+                try:
+                    l, k, m = tuple(perform_binary_op_on_vwes(left, right, operation))
+                except errpp.ExcessiveErrorException:
+                    continue
                 method(self, l, k, m)
         return perform_binary_op_test
     return wrapper
@@ -90,9 +93,12 @@ def _binary_op_propagation_test(operation):
         def perform_binary_op_test(self):
             for a, b in zip(self.lefts, self.rights):
                 self.expected_val = operation(a.value, b.value)
-                self.calculated = operation(a, b)
-                method(self, a, b)
-                self.compare_values_and_errors()
+                try:
+                    self.calculated = operation(a, b)
+                    method(self, a, b)
+                    self.compare_values_and_errors()
+                except errpp.ExcessiveErrorException:
+                    continue
         return perform_binary_op_test
     return wrapper
 
