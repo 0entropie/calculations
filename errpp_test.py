@@ -112,6 +112,7 @@ class ErrorClassTest(abc.ABC):
     def setUp(self):
         self.lefts = (vwe_from_val_abs_err_pair(self.getErrorType(), random_val_and_abs_error()) for _ in range(_TRIALS))
         self.rights = (vwe_from_val_abs_err_pair(self.getErrorType(), random_val_and_abs_error()) for _ in range(_TRIALS))
+        self.err = self.getErrorType()()
 
     def round_dec(self, n, decs = 5):
         return round(n, decs)
@@ -126,6 +127,35 @@ class ErrorClassTest(abc.ABC):
         self.expected_val = -a.value
         self.expected_error = a.abs_err
         self.calculated = -a
+
+    def test_div_zero(self):
+        a, b = errpp.ValueWithError.from_val_abs_err_pair(1, 0, self.err), errpp.ValueWithError.from_val_abs_err_pair(0, 0, self.err)
+        with self.assertRaises(ZeroDivisionError):
+            a / b
+
+    def test_zero_val_rel_err_none(self):
+        a = errpp.ValueWithError.from_val_abs_err_pair(0, 0, self.err)
+        self.assertEqual(a.rel_err, None)
+
+    def test_none_propagation(self):
+        a, b = errpp.ValueWithError.from_val_abs_err_pair(1, 0.9, self.err), errpp.ValueWithError.from_val_abs_err_pair(0, 1, self.err)
+        x = a * b
+        self.assertEqual(x.rel_err, None)
+        self.assertNotEqual(x.abs_err, 0)
+        y = b / a
+        self.assertEqual(y.rel_err, None)
+        self.assertNotEqual(y.abs_err, 0)
+
+    def test_scalar_propagation(self):
+        a, b = errpp.ValueWithError.from_val_abs_err_pair(2, 0, self.err), errpp.ValueWithError.from_val_abs_err_pair(5, 0, self.err)
+        x = a + b
+        self.assertEqual((x.value, x.abs_err, x.rel_err), (7, 0, 0))
+        y = a - b
+        self.assertEqual((y.value, y.abs_err, y.rel_err), (-3, 0, 0))
+        z = a * b
+        self.assertEqual((z.value, z.abs_err, z.rel_err), (10, 0, 0))
+        omega = a / b
+        self.assertEqual((omega.value, omega.abs_err, omega.rel_err), (0.4, 0, 0))
 
 
 def _create_error_class_test(testcls):
