@@ -243,10 +243,28 @@ class ExtremeErrorTest:
         self.expected_error = max(lim1, lim2)
 
 
+class ValueWithErrorBasicTest(unittest.TestCase):
+
+    def test_default_propagator_get_set(self):
+        err1 = errpp.StatisticalPropagation()
+        errpp.set_global_propagator(err1)
+        self.assertEqual(errpp.get_global_propagator(), err1)
+        err2 = errpp.WorstCasePropogation()
+        errpp.set_global_propagator(err2)
+        self.assertEqual(errpp.get_global_propagator(), err2)
+
+    def test_default_propagator_context(self):
+        a, b = [errpp.ValueWithError.from_val_abs_err_pair(1, 1)] * 2
+        cur_glob_prop = errpp.get_global_propagator()
+        with errpp.propagation_context(errpp.WorstCasePropogation()):
+            c = a + b
+            self.assertEqual((2, 2, 1), (c.value, c.abs_err, c.rel_err))
+        self.assertEqual(errpp.get_global_propagator(), cur_glob_prop)
+
 class ErrorPropagation(unittest.TestSuite):
 
     def __init__(self):
-        self.addTests((RelationTest(), StatisticalErrorTest(), ExtremeErrorTest(), WorstCaseErrorTest()))
+        self.addTests((RelationTest(), StatisticalErrorTest(), ExtremeErrorTest(), WorstCaseErrorTest(), ValueWithErrorBasicTest()))
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 import abc
 import math
 from numbers import Number
+from contextlib import contextmanager
 import operator
 
 __percent_scale_factor = 100
@@ -26,17 +27,22 @@ def percent_to_decimal(per):
 
 def _binary_arithmetic_op(method):
     def perform_arithmetic_op(left, right):
-        if not left.prop.is_compatible(other=right.prop):
+        lprop = left.prop or _GLOBAL_PROPAGATION_METHOD
+        rprop = right.prop or _GLOBAL_PROPAGATION_METHOD
+
+        if (not lprop):
+            raise ValueError("Propagation Method on Value was set to global, but global propagation method is None")
+
+        if not lprop.is_compatible(rprop):
             raise ValueError("Incompatible propagation methods")
         # Call original method, only for division to check dividend basically..
         method(left, right)
         
-        operation = left._op_map[method.__name__]
+        operation = ValueWithError._op_map[method.__name__]
         new_val = operation(left.value, right.value)
 
-        prop_method = left._prop_map[operation]
+        prop_method = getattr(lprop, ValueWithError._prop_map[operation])
         new_abs_err = prop_method(new_val, left, right)
-
         return ValueWithError.from_val_abs_err_pair(new_val, new_abs_err, left.prop)
 
     return perform_arithmetic_op
@@ -52,9 +58,65 @@ class ExcessiveErrorException(Exception):
                          f" {_REL_ERROR_FACTOR_LIMIT} ({decimal_to_percent(_REL_ERROR_FACTOR_LIMIT)}).")
 
 
+_GLOBAL_PROPAGATION_METHOD = None
+
+
+def set_global_propagator(prop):
+    if prop is not None and not isinstance(prop, ErrorPropagationMethod):
+        raise TypeError("Propagator must be instance of ErrorPropagationMethod")
+    
+    global _GLOBAL_PROPAGATION_METHOD
+    _GLOBAL_PROPAGATION_METHOD = prop
+
+
+def get_global_propagator():
+    return _GLOBAL_PROPAGATION_METHOD
+
+
+@contextmanager
+def propagation_context(prop):
+    old_prop = get_global_propagator()
+    try:
+        set_global_propagator(prop)
+        yield object()
+    finally:
+        set_global_propagator(old_prop)
+
+class ErrorPropagationMethod(abc.ABC):
+
+    @abc.abstractmethod
+    def propagate_error_add(self, add_result, left, right):
+        pass
+
+    @abc.abstractmethod
+    def propagate_error_sub(self, sub_result, left, right):
+        pass
+
+    @abc.abstractmethod
+    def propagate_error_mul(self, mul_result, left, right):
+        pass
+
+    @abc.abstractmethod
+    def propagate_error_div(self, div_result, left, right):
+        pass
+
+    @abc.abstractmethod
+    def is_compatible(self, other):
+        pass
+
 class ValueWithError:
 
-    def __init__(self, value, abs_err, rel_err, prop_method):
+    _prop_map = {operator.add: ErrorPropagationMethod.propagate_error_add.__name__,
+                 operator.sub: ErrorPropagationMethod.propagate_error_sub.__name__, 
+                 operator.mul: ErrorPropagationMethod.propagate_error_mul.__name__,
+                 operator.truediv: ErrorPropagationMethod.propagate_error_div.__name__}
+        
+    _op_map = {'__add__': operator.add,
+               '__sub__': operator.sub,
+               '__mul__': operator.mul,
+               '__truediv__': operator.truediv}
+
+    def __init__(self, value, abs_err, rel_err, prop_method=None):
         if not (isinstance(value, Number) or isinstance(abs_err, Number))\
                 or (rel_err is not None and not isinstance(rel_err, Number)):
             raise TypeError("Value and Errors need to be numeric types")
@@ -65,17 +127,9 @@ class ValueWithError:
         self.value = value
         self.__abs_err = abs(abs_err)
         self.__rel_err = abs(rel_err) if rel_err is not None else None
-        if prop_method is None:
-            raise ValueError("Error propagation Method may not be 'None'")
+
         self.prop = prop_method
-        self._prop_map = {operator.add: prop_method.propagate_error_add,
-                          operator.sub: prop_method.propagate_error_sub, 
-                          operator.mul: prop_method.propagate_error_mul,
-                          operator.truediv: prop_method.propagate_error_div}
-        self._op_map = {'__add__': operator.add,
-                        '__sub__': operator.sub,
-                        '__mul__': operator.mul,
-                        '__truediv__': operator.truediv}
+
 
     @property
     def abs_err(self):
@@ -86,12 +140,12 @@ class ValueWithError:
         return self.__rel_err
 
     @classmethod
-    def from_val_abs_err_pair(cls, val, abs_err, prop_method):
+    def from_val_abs_err_pair(cls, val, abs_err, prop_method=None):
         rel_err = abs_err/val if val != 0 else None
         return ValueWithError(val, abs_err, rel_err, prop_method)
 
     @classmethod
-    def from_val_rel_err_pair(cls, val, rel_err, prop_method):
+    def from_val_rel_err_pair(cls, val, rel_err, prop_method=None):
         if rel_err is None:
             raise ValueError("Can not construct ValueWithError from value and invalid relative Error")
         abs_err = val * rel_err
@@ -142,27 +196,6 @@ class ValueWithError:
         else:
             raise ValueError("Relative Error is not defined")
 
-class ErrorPropagationMethod(abc.ABC):
-
-    @abc.abstractmethod
-    def propagate_error_add(self, add_result, left, right):
-        pass
-
-    @abc.abstractmethod
-    def propagate_error_sub(self, sub_result, left, right):
-        pass
-
-    @abc.abstractmethod
-    def propagate_error_mul(self, mul_result, left, right):
-        pass
-
-    @abc.abstractmethod
-    def propagate_error_div(self, div_result, left, right):
-        pass
-
-    @abc.abstractmethod
-    def is_compatible(self, other):
-        pass
 
 class StatisticalPropagation(ErrorPropagationMethod):
 
