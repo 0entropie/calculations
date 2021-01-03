@@ -2,6 +2,7 @@ import abc
 import math
 from numbers import Number
 from contextlib import contextmanager
+import threading
 import operator
 
 __percent_scale_factor = 100
@@ -27,8 +28,8 @@ def percent_to_decimal(per):
 
 def _binary_arithmetic_op(method):
     def perform_arithmetic_op(left, right):
-        lprop = left.prop or _GLOBAL_PROPAGATION_METHOD
-        rprop = right.prop or _GLOBAL_PROPAGATION_METHOD
+        lprop = left.prop or _GLOBAL_PROPAGATION_METHOD.p
+        rprop = right.prop or _GLOBAL_PROPAGATION_METHOD.p
 
         if (not lprop):
             raise ValueError("Propagation Method on Value was set to global, but global propagation method is None")
@@ -58,7 +59,8 @@ class ExcessiveErrorException(Exception):
                          f" {_REL_ERROR_FACTOR_LIMIT} ({decimal_to_percent(_REL_ERROR_FACTOR_LIMIT)}).")
 
 
-_GLOBAL_PROPAGATION_METHOD = None
+_GLOBAL_PROPAGATION_METHOD = threading.local()
+_GLOBAL_PROPAGATION_METHOD.p = None
 
 
 def set_global_propagator(prop):
@@ -66,11 +68,11 @@ def set_global_propagator(prop):
         raise TypeError("Propagator must be instance of ErrorPropagationMethod")
     
     global _GLOBAL_PROPAGATION_METHOD
-    _GLOBAL_PROPAGATION_METHOD = prop
+    _GLOBAL_PROPAGATION_METHOD.p = prop
 
 
 def get_global_propagator():
-    return _GLOBAL_PROPAGATION_METHOD
+    return _GLOBAL_PROPAGATION_METHOD.p
 
 
 @contextmanager
